@@ -8,7 +8,6 @@ import (
 
 // Profile is the JSON sandbox profile (see README.md for the format).
 type Profile struct {
-	Workdir     string         `json:"workdir"`
 	Filesystem  filesystemCfg  `json:"filesystem"`
 	Network     networkCfg     `json:"network"`
 	Environment environmentCfg `json:"environment"`
@@ -60,14 +59,13 @@ func LoadProfile(path string) (Profile, error) {
 }
 
 // ConfigFromProfile applies the defaults to a profile: network mode
-// defaults to filtered, workdir to the current directory.
+// defaults to filtered. The workdir is always the current directory.
 func ConfigFromProfile(p Profile) Config {
 	cfg := Config{
 		Read:          p.Filesystem.Read,
 		Write:         p.Filesystem.Write,
 		Deny:          p.Filesystem.Deny,
 		NoDefaultDeny: p.Filesystem.NoDefaultDeny,
-		Workdir:       p.Workdir,
 		NetworkMode:   p.Network.Mode,
 		AllowDomains:  p.Network.AllowDomain,
 		DenyDomains:   p.Network.DenyDomain,
@@ -78,10 +76,8 @@ func ConfigFromProfile(p Profile) Config {
 	if cfg.NetworkMode == "" {
 		cfg.NetworkMode = ModeFiltered
 	}
-	if cfg.Workdir == "" {
-		if wd, err := os.Getwd(); err == nil {
-			cfg.Workdir = wd
-		}
+	if wd, err := os.Getwd(); err == nil {
+		cfg.Workdir = wd
 	}
 	return cfg
 }

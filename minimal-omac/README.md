@@ -30,7 +30,8 @@ extras).
 
 `--profile` is the only flag and is required: all configuration lives in
 the JSON profile (see below). Run `./minimal-omac` with no arguments for
-the short usage text.
+the short usage text. The command always runs in the current working
+directory, granted read+write.
 
 ## How it works
 
@@ -67,7 +68,6 @@ the short usage text.
 
 ```json
 {
-  "workdir": "~/project",
   "filesystem": { "read": ["~/go"], "write": [], "deny": [] },
   "network": {
     "mode": "filtered",
@@ -79,9 +79,9 @@ the short usage text.
 }
 ```
 
-Defaults for absent fields: `workdir` is the current directory,
-`network.mode` is `filtered`, and `filesystem.no_default_deny` is
-`false` (the built-in protected set stays on).
+Defaults for absent fields: `network.mode` is `filtered`,
+`filesystem.no_default_deny` is `false` (the built-in protected set
+stays on).
 
 ## Deliberately NOT recreated from omac
 
