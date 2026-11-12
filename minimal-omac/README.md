@@ -14,10 +14,7 @@ access. Linux only.
 ```
 
 Installs the apt dependencies (bubblewrap plus the omac-quick-start
-extras, and `golang-go` if you have no Go toolchain), verifies bwrap
-can create user namespaces (granting an AppArmor exception on
-Ubuntu 23.10+ if needed), checks the kernel for Landlock (6.7+), and
-builds `./minimal-omac`.
+extras).
 
 ## Usage
 
