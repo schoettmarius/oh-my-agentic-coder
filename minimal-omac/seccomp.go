@@ -112,7 +112,6 @@ func datagramSeccompFilter() []unix.SockFilter {
 		{Code: bpfRET, K: retEPERM},
 	}
 }
-}
 
 func applyDatagramSeccomp() error {
 	filter := datagramSeccompFilter()
