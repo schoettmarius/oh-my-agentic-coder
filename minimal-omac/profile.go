@@ -38,7 +38,6 @@ type Config struct {
 	Read, Write, Deny         []string
 	NoDefaultDeny             bool
 	Workdir                   string
-	NetworkMode               string
 	AllowDomains, DenyDomains []string
 	OpenPorts                 []int
 	AllowEnv, DenyEnv         []string
@@ -58,26 +57,28 @@ func LoadProfile(path string) (Profile, error) {
 	return p, nil
 }
 
-// ConfigFromProfile applies the defaults to a profile: network mode
-// defaults to filtered. The workdir is always the current directory.
-func ConfigFromProfile(p Profile) Config {
+// ConfigFromProfile applies the defaults to a profile. Network mode is
+// always filtered; a profile that names a different mode is an error.
+// The workdir is always the current directory.
+func ConfigFromProfile(p Profile) (Config, error) {
 	cfg := Config{
 		Read:          p.Filesystem.Read,
 		Write:         p.Filesystem.Write,
 		Deny:          p.Filesystem.Deny,
 		NoDefaultDeny: p.Filesystem.NoDefaultDeny,
-		NetworkMode:   p.Network.Mode,
 		AllowDomains:  p.Network.AllowDomain,
 		DenyDomains:   p.Network.DenyDomain,
 		OpenPorts:     p.Network.OpenPorts,
 		AllowEnv:      p.Environment.AllowVars,
 		DenyEnv:       p.Environment.DenyVars,
 	}
-	if cfg.NetworkMode == "" {
-		cfg.NetworkMode = ModeFiltered
+	switch p.Network.Mode {
+	case "", ModeFiltered:
+	default:
+		return cfg, fmt.Errorf("network.mode %q is not supported (filtered is the only mode)", p.Network.Mode)
 	}
 	if wd, err := os.Getwd(); err == nil {
 		cfg.Workdir = wd
 	}
-	return cfg
+	return cfg, nil
 }

@@ -12,33 +12,26 @@ import (
 )
 
 // Stage2Args serializes the network rules for the stage2 re-exec:
-// repeated --connect-tcp N / --bind-tcp N flags, then --enforce when the
-// kernel must restrict TCP. Open mode passes nothing and stage2 just
-// execs.
+// repeated --connect-tcp N / --bind-tcp N flags, then --enforce so the
+// kernel restricts TCP to the granted ports.
 func Stage2Args(g *Grants) []string {
-	var args []string
-	if g.NetworkMode == ModeFiltered {
-		connect := map[int]bool{}
-		bind := map[int]bool{}
-		if g.ProxyPort > 0 {
-			connect[g.ProxyPort] = true
-		}
-		for _, p := range g.OpenPorts {
-			connect[p] = true
-			bind[p] = true
-		}
-		for _, p := range sortedInts(connect) {
-			args = append(args, "--connect-tcp", strconv.Itoa(p))
-		}
-		for _, p := range sortedInts(bind) {
-			args = append(args, "--bind-tcp", strconv.Itoa(p))
-		}
-		args = append(args, "--enforce")
-	} else if g.NetworkMode == ModeBlocked {
-		// No ports at all: a full TCP block.
-		args = append(args, "--enforce")
+	connect := map[int]bool{}
+	bind := map[int]bool{}
+	if g.ProxyPort > 0 {
+		connect[g.ProxyPort] = true
 	}
-	return args
+	for _, p := range g.OpenPorts {
+		connect[p] = true
+		bind[p] = true
+	}
+	var args []string
+	for _, p := range sortedInts(connect) {
+		args = append(args, "--connect-tcp", strconv.Itoa(p))
+	}
+	for _, p := range sortedInts(bind) {
+		args = append(args, "--bind-tcp", strconv.Itoa(p))
+	}
+	return append(args, "--enforce")
 }
 
 func sortedInts(m map[int]bool) []int {

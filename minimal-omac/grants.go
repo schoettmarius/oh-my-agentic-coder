@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	ModeOpen     = "open"
-	ModeBlocked  = "blocked"
+	// ModeFiltered is the only network mode: TCP goes through the
+	// filtering proxy unless explicitly granted, UDP/ICMP are blocked.
 	ModeFiltered = "filtered"
 )
 
@@ -22,9 +22,8 @@ type Grants struct {
 	WritePaths     []string // read+write
 	ProtectedPaths []string // masked with denial markers; not filtered for existence
 
-	NetworkMode  string // open|blocked|filtered
-	ProxyPort    int    // set once the filtered-mode proxy is running
-	OpenPorts    []int  // bind+connect grants
+	ProxyPort    int   // set once the filtering proxy is running
+	OpenPorts    []int // bind+connect grants
 	AllowDomains []string
 	DenyDomains  []string
 
@@ -63,15 +62,8 @@ func ResolveGrants(cfg Config) (*Grants, []string, error) {
 	if info, err := os.Stat(workdir); err != nil || !info.IsDir() {
 		return nil, nil, fmt.Errorf("workdir %s is not an existing directory", workdir)
 	}
-	switch cfg.NetworkMode {
-	case ModeOpen, ModeBlocked, ModeFiltered:
-	default:
-		return nil, nil, fmt.Errorf("invalid network mode %q (want open, blocked, or filtered)", cfg.NetworkMode)
-	}
-
 	g := &Grants{
 		Workdir:      workdir,
-		NetworkMode:  cfg.NetworkMode,
 		OpenPorts:    cfg.OpenPorts,
 		AllowDomains: cfg.AllowDomains,
 		DenyDomains:  cfg.DenyDomains,

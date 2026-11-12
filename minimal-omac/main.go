@@ -77,7 +77,10 @@ func cmdRun(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	cfg := ConfigFromProfile(profile)
+	cfg, err := ConfigFromProfile(profile)
+	if err != nil {
+		return fail("%v", err)
+	}
 
 	grants, warnings, err := ResolveGrants(cfg)
 	if err != nil {
@@ -87,20 +90,17 @@ func cmdRun(args []string) int {
 		fmt.Fprintf(os.Stderr, "minimal-omac: warning: %s\n", w)
 	}
 
-	// Filtered mode runs a local proxy and points the sandbox at it via
+	// The local proxy mediates HTTP(S) and points the sandbox at it via
 	// HTTP(S)_PROXY; Landlock then only ever grants the proxy port.
 	injected := map[string]string{}
-	var proxy *Proxy
-	if grants.NetworkMode == ModeFiltered {
-		proxy, err = StartProxy(ProxyPolicy{Allow: grants.AllowDomains, Deny: grants.DenyDomains})
-		if err != nil {
-			return fail("start filtering proxy: %v", err)
-		}
-		defer proxy.Close()
-		grants.ProxyPort = proxy.Port()
-		for k, v := range proxy.EnvVars() {
-			injected[k] = v
-		}
+	proxy, err := StartProxy(ProxyPolicy{Allow: grants.AllowDomains, Deny: grants.DenyDomains})
+	if err != nil {
+		return fail("start filtering proxy: %v", err)
+	}
+	defer proxy.Close()
+	grants.ProxyPort = proxy.Port()
+	for k, v := range proxy.EnvVars() {
+		injected[k] = v
 	}
 
 	// Denial markers must outlive the bwrap launch: cleanup only after the

@@ -24,15 +24,13 @@ func BuildChildArgv(g *Grants, innerArgv []string) ([]string, error) {
 	if _, err := exec.LookPath("bwrap"); err != nil {
 		return nil, fmt.Errorf("bubblewrap (bwrap) not found on PATH — install it with your package manager (e.g. sudo apt install bubblewrap): %w", err)
 	}
-	needsLandlock := g.NetworkMode == ModeFiltered || g.NetworkMode == ModeBlocked
-	if needsLandlock && !LandlockNetSupported() {
+	if !LandlockNetSupported() {
 		return nil, fmt.Errorf(
 			"minimal-omac can't enforce network rules on this kernel, so it won't start.\n"+
 				"\n"+
 				"Network enforcement uses Landlock TCP rules, which need Landlock ABI 4\n"+
 				"(Linux kernel 6.7 or newer). This kernel is %s (Landlock ABI %d).\n"+
-				"Set network.mode to \"open\" in the profile to launch without network rules,\n"+
-				"or upgrade the kernel.",
+				"Upgrade the kernel.",
 			kernelVersionString(), LandlockABI())
 	}
 	self, err := os.Executable()
