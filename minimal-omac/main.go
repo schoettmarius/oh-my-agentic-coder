@@ -77,10 +77,7 @@ func cmdRun(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	cfg, err := ConfigFromProfile(profile)
-	if err != nil {
-		return fail("%v", err)
-	}
+	cfg := ConfigFromProfile(profile)
 
 	grants, warnings, err := ResolveGrants(cfg)
 	if err != nil {

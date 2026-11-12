@@ -8,12 +8,6 @@ import (
 	"strings"
 )
 
-const (
-	// ModeFiltered is the only network mode: TCP goes through the
-	// filtering proxy unless explicitly granted, UDP/ICMP are blocked.
-	ModeFiltered = "filtered"
-)
-
 // Grants is the fully resolved input to the bwrap backend: absolute,
 // existing path grants, the protected set to mask, and the network rules.
 type Grants struct {
@@ -82,10 +76,8 @@ func ResolveGrants(cfg Config) (*Grants, []string, error) {
 	// Protected paths are NOT existence-filtered: a missing ~/.ssh today
 	// may exist tomorrow, and masking is idempotent either way.
 	var deny []string
-	if !cfg.NoDefaultDeny {
-		for _, rel := range defaultDenyRelPaths() {
-			deny = append(deny, filepath.Join(home, rel))
-		}
+	for _, rel := range defaultDenyRelPaths() {
+		deny = append(deny, filepath.Join(home, rel))
 	}
 	deny = append(deny, cfg.Deny...)
 	for _, p := range expandAll(deny) {

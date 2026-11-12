@@ -14,14 +14,12 @@ type Profile struct {
 }
 
 type filesystemCfg struct {
-	Read          []string `json:"read"`
-	Write         []string `json:"write"`
-	Deny          []string `json:"deny"`
-	NoDefaultDeny bool     `json:"no_default_deny"`
+	Read  []string `json:"read"`
+	Write []string `json:"write"`
+	Deny  []string `json:"deny"`
 }
 
 type networkCfg struct {
-	Mode        string   `json:"mode"`
 	AllowDomain []string `json:"allow_domain"`
 	DenyDomain  []string `json:"deny_domain"`
 	OpenPorts   []int    `json:"open_ports"`
@@ -36,7 +34,6 @@ type environmentCfg struct {
 // defaults filling whatever the profile leaves unset.
 type Config struct {
 	Read, Write, Deny         []string
-	NoDefaultDeny             bool
 	Workdir                   string
 	AllowDomains, DenyDomains []string
 	OpenPorts                 []int
@@ -57,28 +54,21 @@ func LoadProfile(path string) (Profile, error) {
 	return p, nil
 }
 
-// ConfigFromProfile applies the defaults to a profile. Network mode is
-// always filtered; a profile that names a different mode is an error.
-// The workdir is always the current directory.
-func ConfigFromProfile(p Profile) (Config, error) {
+// ConfigFromProfile applies the defaults to a profile. The workdir is
+// always the current directory.
+func ConfigFromProfile(p Profile) Config {
 	cfg := Config{
-		Read:          p.Filesystem.Read,
-		Write:         p.Filesystem.Write,
-		Deny:          p.Filesystem.Deny,
-		NoDefaultDeny: p.Filesystem.NoDefaultDeny,
-		AllowDomains:  p.Network.AllowDomain,
-		DenyDomains:   p.Network.DenyDomain,
-		OpenPorts:     p.Network.OpenPorts,
-		AllowEnv:      p.Environment.AllowVars,
-		DenyEnv:       p.Environment.DenyVars,
-	}
-	switch p.Network.Mode {
-	case "", ModeFiltered:
-	default:
-		return cfg, fmt.Errorf("network.mode %q is not supported (filtered is the only mode)", p.Network.Mode)
+		Read:         p.Filesystem.Read,
+		Write:        p.Filesystem.Write,
+		Deny:         p.Filesystem.Deny,
+		AllowDomains: p.Network.AllowDomain,
+		DenyDomains:  p.Network.DenyDomain,
+		OpenPorts:    p.Network.OpenPorts,
+		AllowEnv:     p.Environment.AllowVars,
+		DenyEnv:      p.Environment.DenyVars,
 	}
 	if wd, err := os.Getwd(); err == nil {
 		cfg.Workdir = wd
 	}
-	return cfg, nil
+	return cfg
 }

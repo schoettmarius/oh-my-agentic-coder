@@ -122,6 +122,5 @@ func defaultDenialText() string {
 	return "# This file or directory is protected by minimal-omac.\n" +
 		"# The real content exists on the host but is deliberately hidden from\n" +
 		"# the sandbox. If the agent needs access, adjust the deny list in the\n" +
-		"# sandbox profile (filesystem.deny, or filesystem.no_default_deny\n" +
-		"# to drop the built-in protected set).\n"
+		"# sandbox profile (filesystem.deny).\n"
 }
