@@ -11,7 +11,7 @@ import (
 // defaultAllowEnv is the built-in environment allowlist: the operational
 // minimum a shell and the usual toolchain need. Everything else (provider
 // tokens, credentials, ambient secrets) is stripped unless explicitly
-// allowed with --allow-env / profile allow_vars.
+// allowed via environment.allow_vars in the profile.
 func defaultAllowEnv() []string {
 	return []string{
 		"HOME", "PATH", "SHELL", "TERM", "TMPDIR",
@@ -122,5 +122,6 @@ func defaultDenialText() string {
 	return "# This file or directory is protected by minimal-omac.\n" +
 		"# The real content exists on the host but is deliberately hidden from\n" +
 		"# the sandbox. If the agent needs access, adjust the deny list in the\n" +
-		"# sandbox profile or the --deny / --no-default-deny flags.\n"
+		"# sandbox profile (filesystem.deny, or filesystem.no_default_deny\n" +
+		"# to drop the built-in protected set).\n"
 }

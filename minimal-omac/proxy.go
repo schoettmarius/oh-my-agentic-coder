@@ -188,6 +188,6 @@ func denyResponse(w http.ResponseWriter, host string) {
 	w.WriteHeader(http.StatusForbidden)
 	fmt.Fprintf(w,
 		"minimal-omac proxy: %s is not in the network allow list.\n"+
-			"Allow it with --allow-domain (or network.allow_domain in the profile)\n"+
-			"and restart the sandbox.\n", host)
+			"Allow it by adding it to network.allow_domain in the profile\n"+
+			"and restarting the sandbox.\n", host)
 }

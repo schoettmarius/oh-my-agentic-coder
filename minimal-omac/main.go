@@ -15,8 +15,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strconv"
-	"strings"
 	"syscall"
 )
 
@@ -41,100 +39,32 @@ func main() {
 }
 
 func usage(w *os.File, prog string) {
-	fmt.Fprintf(w, `usage: %[1]s run [flags] -- command [args...]
+	fmt.Fprintf(w, `usage: %[1]s run --profile PATH -- command [args...]
 
-Run COMMAND inside a bubblewrap + Landlock sandbox.
+Run COMMAND inside a bubblewrap + Landlock sandbox, configured
+entirely by a JSON profile (format in README.md).
 
-  --profile PATH         load a JSON sandbox profile (see README.md);
-                         the flags below extend or override it
-  --read PATH            grant PATH read-only (repeatable)
-  --write PATH           grant PATH read+write (repeatable)
-  --deny PATH            protect PATH: mask it with a denial marker even
-                         under broader grants (repeatable; adds to the
-                         built-in protected set)
-  --no-default-deny      drop the built-in protected set (~/.ssh, ~/.gnupg,
-                         shell configs, ...)
-  --workdir DIR          working directory, granted read+write (default: cwd)
-  --network MODE         open | blocked | filtered (default: filtered)
-  --allow-domain DOMAIN  filtered mode: allow HTTP(S) to DOMAIN and its
-                         subdomains through the proxy (repeatable)
-  --deny-domain DOMAIN   filtered mode: always block DOMAIN, even if
-                         allowed (repeatable)
-  --open-port N          allow the sandbox to bind and connect to TCP
-                         port N (repeatable)
-  --allow-env VAR        pass environment variable VAR into the sandbox
-                         (repeatable; adds to the built-in allowlist)
-  --deny-env VAR         strip VAR even if otherwise allowed (repeatable)
+  --profile PATH         load a JSON sandbox profile (required)
 
 Examples:
-  %[1]s run -- bash
-  %[1]s run --network blocked -- go test ./...
-  %[1]s run --network filtered --allow-domain github.com -- git fetch
+  %[1]s run --profile profile.json -- bash
 `, prog)
-}
-
-// strList and intList are repeatable flag values.
-type strList []string
-
-func (l *strList) String() string     { return strings.Join(*l, ",") }
-func (l *strList) Set(v string) error { *l = append(*l, v); return nil }
-
-type intList []int
-
-func (l *intList) String() string {
-	parts := make([]string, len(*l))
-	for i, n := range *l {
-		parts[i] = strconv.Itoa(n)
-	}
-	return strings.Join(parts, ",")
-}
-
-func (l *intList) Set(v string) error {
-	n, err := strconv.Atoi(v)
-	if err != nil || n < 1 || n > 65535 {
-		return fmt.Errorf("invalid port %q (want 1..65535)", v)
-	}
-	*l = append(*l, n)
-	return nil
-}
-
-// runFlags mirrors every run flag; MergeConfig combines it with a profile.
-type runFlags struct {
-	profile       string
-	reads         strList
-	writes        strList
-	denies        strList
-	noDefaultDeny bool
-	workdir       string
-	network       string
-	allowDomains  strList
-	denyDomains   strList
-	openPorts     intList
-	allowEnv      strList
-	denyEnv       strList
 }
 
 func cmdRun(args []string) int {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
-	f := runFlags{}
-	fs.StringVar(&f.profile, "profile", "", "JSON sandbox profile")
-	fs.Var(&f.reads, "read", "grant read-only path (repeatable)")
-	fs.Var(&f.writes, "write", "grant read+write path (repeatable)")
-	fs.Var(&f.denies, "deny", "protect path with a denial marker (repeatable)")
-	fs.BoolVar(&f.noDefaultDeny, "no-default-deny", false, "drop the built-in protected set")
-	fs.StringVar(&f.workdir, "workdir", "", "working directory (default: cwd)")
-	fs.StringVar(&f.network, "network", "", "open | blocked | filtered")
-	fs.Var(&f.allowDomains, "allow-domain", "filtered mode: allow HTTP(S) to domain (repeatable)")
-	fs.Var(&f.denyDomains, "deny-domain", "filtered mode: always block domain (repeatable)")
-	fs.Var(&f.openPorts, "open-port", "allow bind+connect on TCP port (repeatable)")
-	fs.Var(&f.allowEnv, "allow-env", "pass environment variable into the sandbox (repeatable)")
-	fs.Var(&f.denyEnv, "deny-env", "strip environment variable even if allowed (repeatable)")
+	profilePath := ""
+	fs.StringVar(&profilePath, "profile", "", "JSON sandbox profile (required)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
 	inner := fs.Args()
+	if profilePath == "" {
+		fmt.Fprintln(os.Stderr, "minimal-omac: --profile is required (see: minimal-omac run --profile profile.json -- <command>)")
+		return 2
+	}
 	if len(inner) == 0 {
-		fmt.Fprintln(os.Stderr, "minimal-omac: no command after the flags (see: minimal-omac run -- <command>)")
+		fmt.Fprintln(os.Stderr, "minimal-omac: no command after the flags (see: minimal-omac run --profile profile.json -- <command>)")
 		return 2
 	}
 
@@ -143,11 +73,11 @@ func cmdRun(args []string) int {
 		return 1
 	}
 
-	profile, err := LoadProfile(f.profile)
+	profile, err := LoadProfile(profilePath)
 	if err != nil {
 		return fail("%v", err)
 	}
-	cfg := MergeConfig(profile, f)
+	cfg := ConfigFromProfile(profile)
 
 	grants, warnings, err := ResolveGrants(cfg)
 	if err != nil {

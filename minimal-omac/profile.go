@@ -8,15 +8,17 @@ import (
 
 // Profile is the JSON sandbox profile (see README.md for the format).
 type Profile struct {
+	Workdir     string         `json:"workdir"`
 	Filesystem  filesystemCfg  `json:"filesystem"`
 	Network     networkCfg     `json:"network"`
 	Environment environmentCfg `json:"environment"`
 }
 
 type filesystemCfg struct {
-	Read  []string `json:"read"`
-	Write []string `json:"write"`
-	Deny  []string `json:"deny"`
+	Read          []string `json:"read"`
+	Write         []string `json:"write"`
+	Deny          []string `json:"deny"`
+	NoDefaultDeny bool     `json:"no_default_deny"`
 }
 
 type networkCfg struct {
@@ -31,9 +33,8 @@ type environmentCfg struct {
 	DenyVars  []string `json:"deny_vars"`
 }
 
-// Config is the effective configuration after merging a profile with the
-// run flags: lists are concatenated, scalar flags win over the profile
-// when set, and defaults fill the rest.
+// Config is the effective configuration derived from a profile, with
+// defaults filling whatever the profile leaves unset.
 type Config struct {
 	Read, Write, Deny         []string
 	NoDefaultDeny             bool
@@ -44,13 +45,10 @@ type Config struct {
 	AllowEnv, DenyEnv         []string
 }
 
-// LoadProfile reads a profile JSON file; an empty path yields the zero
-// profile (defaults only, no filesystem access).
+// LoadProfile reads a profile JSON file; the path must not be empty
+// (run requires --profile).
 func LoadProfile(path string) (Profile, error) {
 	var p Profile
-	if path == "" {
-		return p, nil
-	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return p, fmt.Errorf("read profile %s: %w", path, err)
@@ -61,22 +59,21 @@ func LoadProfile(path string) (Profile, error) {
 	return p, nil
 }
 
-func MergeConfig(p Profile, f runFlags) Config {
+// ConfigFromProfile applies the defaults to a profile: network mode
+// defaults to filtered, workdir to the current directory.
+func ConfigFromProfile(p Profile) Config {
 	cfg := Config{
-		Read:          concat(p.Filesystem.Read, f.reads),
-		Write:         concat(p.Filesystem.Write, f.writes),
-		Deny:          concat(p.Filesystem.Deny, f.denies),
-		NoDefaultDeny: f.noDefaultDeny,
-		Workdir:       f.workdir,
-		NetworkMode:   f.network,
-		AllowDomains:  concat(p.Network.AllowDomain, f.allowDomains),
-		DenyDomains:   concat(p.Network.DenyDomain, f.denyDomains),
-		OpenPorts:     append(append([]int{}, p.Network.OpenPorts...), f.openPorts...),
-		AllowEnv:      concat(p.Environment.AllowVars, f.allowEnv),
-		DenyEnv:       concat(p.Environment.DenyVars, f.denyEnv),
-	}
-	if cfg.NetworkMode == "" {
-		cfg.NetworkMode = p.Network.Mode
+		Read:          p.Filesystem.Read,
+		Write:         p.Filesystem.Write,
+		Deny:          p.Filesystem.Deny,
+		NoDefaultDeny: p.Filesystem.NoDefaultDeny,
+		Workdir:       p.Workdir,
+		NetworkMode:   p.Network.Mode,
+		AllowDomains:  p.Network.AllowDomain,
+		DenyDomains:   p.Network.DenyDomain,
+		OpenPorts:     p.Network.OpenPorts,
+		AllowEnv:      p.Environment.AllowVars,
+		DenyEnv:       p.Environment.DenyVars,
 	}
 	if cfg.NetworkMode == "" {
 		cfg.NetworkMode = ModeFiltered
@@ -87,10 +84,4 @@ func MergeConfig(p Profile, f runFlags) Config {
 		}
 	}
 	return cfg
-}
-
-func concat(a, b []string) []string {
-	out := make([]string, 0, len(a)+len(b))
-	out = append(out, a...)
-	return append(out, b...)
 }

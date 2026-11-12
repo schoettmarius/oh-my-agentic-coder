@@ -31,7 +31,8 @@ func BuildChildArgv(g *Grants, innerArgv []string) ([]string, error) {
 				"\n"+
 				"Network enforcement uses Landlock TCP rules, which need Landlock ABI 4\n"+
 				"(Linux kernel 6.7 or newer). This kernel is %s (Landlock ABI %d).\n"+
-				"Use --network open to launch without network rules, or upgrade the kernel.",
+				"Set network.mode to \"open\" in the profile to launch without network rules,\n"+
+				"or upgrade the kernel.",
 			kernelVersionString(), LandlockABI())
 	}
 	self, err := os.Executable()

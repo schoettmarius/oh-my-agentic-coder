@@ -119,9 +119,9 @@ func ExecInner(argv []string) error {
 		return fmt.Errorf(
 			"cannot run %q inside the sandbox: %q not found in the sandbox filesystem.\n"+
 				"This usually means the binary lives in a directory that was not\n"+
-				"mounted into the sandbox. Grant read access to its directory, e.g.:\n"+
-				"    minimal-omac run --read \"$(dirname \"$(command -v %s)\")\" -- ...\n"+
-				"or add that directory to filesystem.read in your profile.\n"+
+				"mounted into the sandbox. Add that directory to filesystem.read\n"+
+				"in your profile, e.g.:\n"+
+				"    \"filesystem\": { \"read\": [ \"$(dirname \"$(command -v %s)\")\" ] }\n"+
 				"underlying error: %w",
 			requested, path, requested, err)
 	}
