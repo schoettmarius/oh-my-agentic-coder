@@ -91,10 +91,12 @@ func resolveInnerCommand(innerArgv []string) ([]string, []string) {
 	return out, dirs
 }
 
-// mount is one bwrap bind entry.
+// mount is one bwrap bind entry. A tmpfs mount has no source: it puts a
+// fresh empty writable tmpfs at the path (used for the fresh $HOME).
 type mount struct {
-	path string
-	rw   bool
+	path  string
+	rw    bool
+	tmpfs bool
 }
 
 // BuildBwrapArgv constructs the bubblewrap invocation for the grant set:
@@ -108,6 +110,8 @@ type mount struct {
 //   - --new-session so confined code cannot inject keystrokes into the
 //     host terminal via TIOCSTI
 //   - protected paths inside granted trees masked with the denial markers
+//   - an empty writable tmpfs at $HOME unless a grant covers the real
+//     home directory (FreshHome)
 func BuildBwrapArgv(g *Grants, stage2Argv []string) ([]string, error) {
 	if len(stage2Argv) == 0 {
 		return nil, errors.New("bwrap: empty stage2 argv")
@@ -145,6 +149,14 @@ func BuildBwrapArgv(g *Grants, stage2Argv []string) ([]string, error) {
 		add(p, true)
 	}
 
+	// FreshHome: no grant covers $HOME, so instead of exposing the real
+	// home files put an empty writable tmpfs there. Sorted parent-first
+	// it precedes any granted subpaths under $HOME (e.g. a read-only
+	// ~/go), which then layer over it.
+	if g.FreshHome && g.Home != "" {
+		mounts[g.Home] = &mount{path: g.Home, tmpfs: true}
+	}
+
 	// Sort parents before children so nested binds layer correctly (a
 	// path and its prefix make lexicographic order parent-first).
 	ordered := make([]*mount, 0, len(mounts))
@@ -158,24 +170,24 @@ func BuildBwrapArgv(g *Grants, stage2Argv []string) ([]string, error) {
 	for _, m := range ordered {
 		if m.path == "/tmp" {
 			tmpGranted = true
-			argv = append(argv, bindFlag(m), m.path, m.path)
+			argv = append(argv, mountArgs(m)...)
 			continue
 		}
 		if rootGranted {
 			continue
 		}
-		// Defer /tmp subpath binds: they must layer over --tmpfs /tmp.
+		// Defer /tmp subpath mounts: they must layer over --tmpfs /tmp.
 		if strings.HasPrefix(m.path, "/tmp/") {
 			tmpSub = append(tmpSub, m)
 			continue
 		}
-		argv = append(argv, bindFlag(m), m.path, m.path)
+		argv = append(argv, mountArgs(m)...)
 	}
 	if !tmpGranted {
 		argv = append(argv, "--tmpfs", "/tmp")
 	}
 	for _, m := range tmpSub {
-		argv = append(argv, bindFlag(m), m.path, m.path)
+		argv = append(argv, mountArgs(m)...)
 	}
 
 	// Protected-path masking must come after the binds they shadow. With
@@ -213,6 +225,15 @@ func bindFlag(m *mount) string {
 		return "--bind"
 	}
 	return "--ro-bind"
+}
+
+// mountArgs returns the bwrap argv entries for a mount: --tmpfs takes
+// only a destination, binds take source and destination.
+func mountArgs(m *mount) []string {
+	if m.tmpfs {
+		return []string{"--tmpfs", m.path}
+	}
+	return []string{bindFlag(m), m.path, m.path}
 }
 
 // isUnder reports whether path equals root or lies below it.

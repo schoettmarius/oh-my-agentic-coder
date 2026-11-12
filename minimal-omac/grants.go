@@ -18,9 +18,11 @@ const (
 // existing path grants, the protected set to mask, and the network rules.
 type Grants struct {
 	Workdir        string
+	Home           string   // the user's real home directory (host side)
 	ReadPaths      []string // read-only
 	WritePaths     []string // read+write
 	ProtectedPaths []string // masked with denial markers; not filtered for existence
+	FreshHome      bool     // mount an empty tmpfs at $HOME instead of exposing real home files
 
 	NetworkMode  string // open|blocked|filtered
 	ProxyPort    int    // set once the filtered-mode proxy is running
@@ -41,9 +43,10 @@ func baselineReadPaths() []string {
 	return []string{"/usr", "/bin", "/sbin", "/lib", "/lib64", "/etc"}
 }
 
-// defaultDenyRelPaths are protected by default even when the whole home
-// directory is granted: credentials and the shell startup files (which
-// exist to be executed, so their denial markers must stay inert).
+// defaultDenyRelPaths are protected by default whenever the real home
+// directory is granted (read or write): credentials and the shell
+// startup files (which exist to be executed, so their denial markers
+// must stay inert).
 func defaultDenyRelPaths() []string {
 	return []string{
 		".ssh", ".gnupg", ".aws", ".kube", ".docker", ".config/gcloud",
@@ -71,6 +74,7 @@ func ResolveGrants(cfg Config) (*Grants, []string, error) {
 
 	g := &Grants{
 		Workdir:      workdir,
+		Home:         home,
 		NetworkMode:  cfg.NetworkMode,
 		OpenPorts:    cfg.OpenPorts,
 		AllowDomains: cfg.AllowDomains,
@@ -82,15 +86,31 @@ func ResolveGrants(cfg Config) (*Grants, []string, error) {
 	read = append(read, cfg.Read...)
 	g.ReadPaths = filterExisting(expandAll(read), &warnings)
 
+	// The home directory is NOT granted by default: the sandbox must not
+	// read the user's home files. FreshHome stays true unless a grant
+	// (read or write) covers $HOME itself — e.g. the profile granting
+	// "~" or an ancestor such as "/home".
 	var write []string
-	write = append(write, home, workdir)
+	write = append(write, workdir)
 	write = append(write, cfg.Write...)
 	g.WritePaths = filterExisting(expandAll(write), &warnings)
 
+	if workdir == home {
+		warnings = append(warnings, "workdir is the home directory, so granting the workdir read+write exposes all real home files")
+	}
+	// isUnder(home, p) is true for p == home too, so one pass suffices.
+	homeGranted := slices.ContainsFunc(g.ReadPaths, func(p string) bool { return isUnder(home, p) }) ||
+		slices.ContainsFunc(g.WritePaths, func(p string) bool { return isUnder(home, p) })
+	g.FreshHome = !homeGranted
+
 	// Protected paths are NOT existence-filtered: a missing ~/.ssh today
-	// may exist tomorrow, and masking is idempotent either way.
+	// may exist tomorrow, and masking is idempotent either way. With a
+	// fresh home the built-in set under $HOME is dropped: those paths
+	// simply do not exist inside the sandbox, and markers over an empty
+	// tmpfs would wrongly suggest hidden content. Explicit
+	// filesystem.deny entries always stay.
 	var deny []string
-	if !cfg.NoDefaultDeny {
+	if !cfg.NoDefaultDeny && !g.FreshHome {
 		for _, rel := range defaultDenyRelPaths() {
 			deny = append(deny, filepath.Join(home, rel))
 		}
