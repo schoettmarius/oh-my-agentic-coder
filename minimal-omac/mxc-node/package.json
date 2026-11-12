@@ -1,0 +1,21 @@
+{
+  "name": "mxc-node",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal cross-platform omac-style sandbox built on MXC (Microsoft eXecution Container)",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/"
+  },
+  "dependencies": {
+    "@microsoft/mxc-sdk": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.3.3"
+  }
+}

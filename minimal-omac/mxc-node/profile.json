@@ -1,0 +1,9 @@
+{
+  "filesystem": { "read": [], "write": [], "deny": [] },
+  "network": {
+    "allow_domain": ["github.com"],
+    "deny_domain": [],
+    "open_ports": []
+  },
+  "environment": { "allow_vars": ["EDITOR"], "deny_vars": [] }
+}
